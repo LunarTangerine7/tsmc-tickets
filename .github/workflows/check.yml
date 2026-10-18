@@ -5,12 +5,13 @@ name: Check TSMC tickets
 
 on:
   schedule:
-    # ── HOW OFTEN TO CHECK ── change this line to change the interval (times are UTC).
-    #   '7 * * * *'     every hour (at :07)              ~720 Actions minutes/month
-    #   '7,37 * * * *'  every 30 minutes                 ~1440 min/month
-    #   '7 */2 * * *'   every 2 hours                    ~360 min/month
-    # Private repos get 2000 free minutes/month, so don't go below every 30 minutes.
-    - cron: '7 * * * *'
+    # ── HOW OFTEN TO CHECK ── change this line to change the interval (minutes are past the hour, UTC).
+    #   '8-58/10 * * * *'  every 10 minutes, at :08 :18 :28 :38 :48 :58
+    #   '8,38 * * * *'     every 30 minutes
+    #   '8 * * * *'        every hour
+    # The repo is public, so Actions minutes are unlimited. GitHub's minimum is every 5 minutes,
+    # and scheduled runs can start a few minutes late when GitHub is busy.
+    - cron: '8-58/10 * * * *'
   workflow_dispatch:
     inputs:
       test_notify:
