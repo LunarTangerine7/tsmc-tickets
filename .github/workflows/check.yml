@@ -1,0 +1,63 @@
+name: Check TSMC tickets
+
+# The code lives in this (private) repo. Run history and the dashboard page are
+# pushed to the public repo named in the DASHBOARD_REPO variable, which serves them on GitHub Pages.
+
+on:
+  schedule:
+    # ── HOW OFTEN TO CHECK ── change this line to change the interval (times are UTC).
+    #   '7 * * * *'     every hour (at :07)              ~720 Actions minutes/month
+    #   '7,37 * * * *'  every 30 minutes                 ~1440 min/month
+    #   '7 */2 * * *'   every 2 hours                    ~360 min/month
+    # Private repos get 2000 free minutes/month, so don't go below every 30 minutes.
+    - cron: '7 * * * *'
+  workflow_dispatch:
+    inputs:
+      test_notify:
+        description: 'Only send a test notification'
+        type: boolean
+        default: false
+
+concurrency:
+  group: check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Send test notification
+        if: ${{ inputs.test_notify }}
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python3 -I checker.py --test-notify
+
+      - uses: actions/checkout@v4
+        if: ${{ !inputs.test_notify }}
+        with:
+          repository: ${{ vars.DASHBOARD_REPO }}
+          ssh-key: ${{ secrets.DASHBOARD_DEPLOY_KEY }}
+          path: site
+
+      - name: Check availability
+        if: ${{ !inputs.test_notify }}
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUNS_FILE: site/data/runs.json
+        run: python3 -I checker.py
+
+      - name: Publish dashboard and history
+        if: ${{ !inputs.test_notify }}
+        working-directory: site
+        run: |
+          cp ../docs/index.html index.html
+          touch .nojekyll
+          git config user.name "tsmc-checker"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Run $(date -u +%FT%TZ)" || exit 0
+          for i in 1 2 3; do git pull --rebase -q && git push -q && exit 0; sleep 5; done
+          exit 1

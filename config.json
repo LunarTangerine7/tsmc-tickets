@@ -1,0 +1,8 @@
+{
+  "target_date": "2026-11-09",
+  "seats_needed": 2,
+  "min_seats_to_alert": 1,
+  "max_runs_kept": 3000,
+  "alert_after_consecutive_failures": 3,
+  "booking_url": "https://www.tsmcmoi.com/en/bookOnline_pickDate"
+}
