@@ -29,11 +29,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install browser-fingerprint HTTP client
+        if: ${{ !inputs.test_notify }}
+        run: pip install -q -r requirements.txt
+
       - name: Send test notification
         if: ${{ inputs.test_notify }}
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python3 -I checker.py --test-notify
+        run: python3 checker.py --test-notify
 
       - uses: actions/checkout@v4
         if: ${{ !inputs.test_notify }}
@@ -47,7 +51,7 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           RUNS_FILE: site/data/runs.json
-        run: python3 -I checker.py
+        run: python3 checker.py
 
       - name: Publish dashboard and history
         if: ${{ !inputs.test_notify }}

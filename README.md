@@ -11,7 +11,7 @@ Checks https://www.tsmcmoi.com/en/bookOnline_pickDate on a schedule, records eve
 ## How the site works
 The booking page embeds `calendarRecord` JSON. Every date listed there is blocked (`status 0` = closed, `1` = full), and any date in the window that is *not* listed is bookable. Per-slot seats come from `GET /res?type=booktime&id=YYYYMMDD` → `availableTime.items[].spaceLeft`.
 
-The site is behind Cloudflare. Python's stdlib `urllib` gets through, but curl and `requests` get challenged. Keep the checker stdlib-only.
+The site is behind Cloudflare. From GitHub its datacenter IPs only pass with a browser TLS fingerprint (`curl_cffi`, impersonating Chrome/Safari); plain `urllib` works from home connections. `fetch()` tries them in order.
 
 ## Run locally
 ```

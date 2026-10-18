@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Check TSMC Museum of Innovation availability and record every run.
 
-Uses only the standard library on purpose: the site is behind Cloudflare,
-and urllib's TLS fingerprint gets through where curl/requests get challenged.
+The site is behind Cloudflare. From GitHub's servers only a browser-like TLS
+fingerprint gets through (curl_cffi impersonating Chrome/Safari); from a home
+connection plain urllib works too. fetch() tries each client until one passes.
 
 Usage:
   python3 checker.py                 # normal run (writes docs/data/runs.json, alerts if found)
@@ -43,19 +44,46 @@ class Blocked(Exception):
     pass
 
 
-def fetch(url):
+def _urllib(url):
     req = urllib.request.Request(url, headers=HEADERS)
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            body = r.read().decode("utf-8", "replace")
+            return r.status, r.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")
-        if "Just a moment" in body or "cf_chl" in body:
-            raise Blocked(f"Cloudflare blocked the request (HTTP {e.code})")
-        raise
-    if "Just a moment" in body:
-        raise Blocked("Cloudflare challenge page")
-    return body
+        return e.code, e.read().decode("utf-8", "replace")
+
+
+def _cffi(browser):
+    def get(url):
+        from curl_cffi import requests  # optional dependency, installed in GitHub Actions
+        r = requests.get(url, impersonate=browser, timeout=30)
+        return r.status_code, r.text
+    return get
+
+
+CLIENTS = [("chrome", _cffi("chrome")), ("safari", _cffi("safari")), ("urllib", _urllib)]
+client_used = None
+
+
+def fetch(url):
+    global client_used
+    order = sorted(CLIENTS, key=lambda c: c[0] != client_used)  # the one that worked last goes first
+    problems = []
+    for name, get in order:
+        try:
+            status, body = get(url)
+        except ImportError:
+            continue
+        except Exception as e:
+            problems.append(f"{name}: {type(e).__name__}")
+            continue
+        if status == 200 and "Just a moment" not in body:
+            client_used = name
+            return body
+        problems.append(f"{name}: HTTP {status}")
+        if "Just a moment" not in body and "cf_chl" not in body:
+            raise RuntimeError(f"HTTP {status} from site")
+    raise Blocked("Cloudflare blocked every client (" + ", ".join(problems) + ")")
 
 
 def parse_calendar(html):
@@ -124,6 +152,7 @@ def check():
         "found": max_space >= CONFIG["min_seats_to_alert"],
         "available_days": available,
         "counts": counts,
+        "client": client_used,
         "closed_days": [d.isoformat() for d, v in sorted(days.items()) if v == "closed"],
     }
 
